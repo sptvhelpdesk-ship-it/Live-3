@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>S-PTV Player (JSON 2)</title>
+    <title>S-PTV Player (Fixed JSON)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
@@ -109,7 +109,7 @@
     <script>
         // ==========================================
         const CF_WORKER = ''; 
-        // JSON 2 à¦²à¦¿à¦à¦
+        // JSON 2 লিংক
         const DATABASE_URL = 'https://api3.sptvhelpdesk.workers.dev/';
         // ==========================================
 
@@ -146,18 +146,31 @@
             }
         }
 
-        // --- JSON 2 à¦«à§à¦à¦¿à¦ à¦²à¦à¦¿à¦ ---
+        // --- JSON 2 Auto-Fix Logic ---
         async function fetchNewData(targetId) {
             try {
                 const response = await fetch(DATABASE_URL);
-                const textData = await response.text();
-                // JSON à¦«à¦¿à¦à§à¦¸
-                let channels = JSON.parse(textData.trim().startsWith('[') ? textData : `[${textData.replace(/}\s*{/g, "},{")}]`);
+                let textData = await response.text();
+                textData = textData.trim();
+
+                // 🔥 JSON ফিক্সার (শেষের ] না থাকলে লাগিয়ে দেবে)
+                if (textData.endsWith('},')) {
+                    textData = textData.slice(0, -1); // শেষের কমা সরাবে
+                }
+                if (!textData.endsWith(']')) {
+                    textData += ']'; // ব্র্যাকেট লাগাবে
+                }
+                
+                // যদি শুরুতে [ না থাকে
+                if (!textData.startsWith('[')) {
+                    textData = '[' + textData;
+                }
+
+                let channels = JSON.parse(textData);
                 
                 const channel = channels.find(c => c.id === targetId);
                 
                 if (channel) {
-                    // à¦²à¦à¦¿à¦: JSON 2 à¦«à¦°à¦®à§à¦¯à¦¾à¦ à¦à¦¨à§à¦¯à¦¾à¦¯à¦¼à§ Key à¦¬à§à¦° à¦à¦°à¦¾
                     let drmConfig = {};
                     if (channel.keys) {
                         const keyId = Object.keys(channel.keys)[0];
@@ -169,12 +182,14 @@
                 } else {
                     showError("Channel ID Not Found");
                 }
-            } catch (err) { showError("Database Error"); }
+            } catch (err) { 
+                console.error(err);
+                showError("Database Error: Bad JSON"); 
+            }
         }
 
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
-            // à¦«à¦¾à¦¸à§à¦ à¦¸à§à¦à¦¾à¦°à§à¦ + à¦¨à§ à¦¡à¦¿à¦²à§
             const config = {
                 streaming: { 
                     bufferingGoal: 0.5, 
@@ -214,7 +229,7 @@
         
         function updateMenus() {
             const q = document.getElementById('quality-menu');
-            q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">Ã</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`;
+            q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`;
             const tracks = player.getVariantTracks();
             const seen = new Set();
             tracks.sort((a,b) => b.height - a.height).forEach(t => {
@@ -224,7 +239,7 @@
                 }
             });
             const a = document.getElementById('audio-menu');
-            a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">Ã</span></div>`;
+            a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`;
             player.getAudioLanguages().forEach(l => a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${l.toUpperCase()}</div>`);
         }
 
@@ -235,7 +250,7 @@
             video.ontimeupdate = () => {
                 if(player.isLive()) {
                     const lat = player.seekRange().end - video.currentTime;
-                    lat < 5 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">â</span> LIVE', document.getElementById('seek-fill').style.width = '100%') 
+                    lat < 5 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">●</span> LIVE', document.getElementById('seek-fill').style.width = '100%') 
                             : (document.getElementById('time-display').innerText = "-" + formatTime(lat), document.getElementById('time-display').style.color = "#ccc", document.getElementById('seek-fill').style.width = (((video.currentTime - player.seekRange().start)/(player.seekRange().end - player.seekRange().start))*100) + '%');
                 } else {
                     document.getElementById('seek-fill').style.width = ((video.currentTime/video.duration)*100) + '%';
